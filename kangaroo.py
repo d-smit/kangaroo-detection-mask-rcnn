@@ -1,33 +1,10 @@
 import os
 import xml.etree.ElementTree as ET
 from mrcnn.utils import Dataset
+from mrcnn.visualize import display_instances
+from mrcnn.utils import extract_bboxes
 import numpy as np
 import matplotlib.pyplot as plt
-
-def extract_bboxes():
-    tree = ET.parse('/home/david/Projects/strath/kangaroo/annots/00001.xml')
-    root = tree.getroot()
-    
-    # extract each bounding box
-    
-    boxes = []
-    
-    for box in root.findall('.//bndbox'):
-        xmin = int(box.find('xmin').text)
-        ymin = int(box.find('ymin').text)
-        xmax = int(box.find('xmax').text)
-        ymax = int(box.find('ymax').text)
-        coors = [xmin, ymin, xmax, ymax]
-        boxes.append(coors)
-    
-    # extract image dimensions
-    
-    width = int(root.find('.//size/width').text)
-    height = int(root.find('.//size/height').text)
-
-    return boxes, width, height
-
-b,w,h = extract_bboxes()
 
 class KangarooDataset(Dataset):
 
@@ -54,8 +31,6 @@ class KangarooDataset(Dataset):
             ann_path = annots + img_id + '.xml'
 
             self.add_image('dataset', image_id=img_id, path=img_path, annotation=ann_path)
-
-
 
     def extract_bboxes(self, filename):
 
@@ -103,9 +78,8 @@ class KangarooDataset(Dataset):
         return masks, np.asarray(class_ids, dtype='uint8')
 
     # load an image reference
-    def image_reference(self, image_id):
-
-    	info = self.image_info[image_id]
+    def image_reference(self, img_id):
+    	info = self.image_info[img_id]
     	return info['path']
 
 dataset_dir = '/home/david/Projects/strath/kangaroo'
@@ -116,29 +90,12 @@ train_set = KangarooDataset()
 train_set.load_dataset(dataset_dir)
 train_set.prepare()
 
-# testing set
+image_id = 1
+image = train_set.load_image(image_id)
+mask, class_ids = train_set.load_mask(image_id)
+bbox = extract_bboxes(mask)
 
-test_set = KangarooDataset()
-test_set.load_dataset(dataset_dir, is_train=False)
-test_set.prepare()
+display_instances(image, bbox, mask, class_ids, train_set.class_names)
 
-# load image
-image_id = 0
-img = train_set.load_image(image_id)
 
-# load mask
-mask, class_id = train_set.load_mask(image_id)
 
-plt.imshow(img)
-plt.imshow(mask[:, :, 0], cmap='jet', alpha=0.5)
-
-for i in range(9):
-    plt.subplot(330 + 1 + i)
-    img = train_set.load_image(i)
-    plt.imshow(img)
-    mask, _ = train_set.load_mask(i)
-
-    for j in range(mask.shape[2]):
-        plt.imshow(mask[:, :, j], cmap='jet', alpha=0.3)
-        
-plt.show()
