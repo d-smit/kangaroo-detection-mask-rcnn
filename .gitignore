@@ -1,4 +1,5 @@
 /data
+/configs
 /kangaroo
 /edge
 *.ods
@@ -6,3 +7,6 @@
 Mask_RCN
 scrap.p
 *.png
+*.h5
+*.pem
+

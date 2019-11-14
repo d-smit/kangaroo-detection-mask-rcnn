@@ -1,10 +1,23 @@
 import os
 import xml.etree.ElementTree as ET
-from mrcnn.utils import Dataset
-from mrcnn.visualize import display_instances
-from mrcnn.utils import extract_bboxes
+
 import numpy as np
 import matplotlib.pyplot as plt
+
+from mrcnn.config import Config
+from mrcnn.visualize import display_instances
+from mrcnn.utils import extract_bboxes
+from mrcnn.utils import Dataset
+from mrcnn.model import MaskRCNN
+from mrcnn.model import load_image_gt
+from mrcnn.model import mold_image
+from mrcnn.utils import compute_ap
+
+import warnings
+warnings.filterwarnings("ignore")
+
+Server = True
+# Server = False
 
 class KangarooDataset(Dataset):
 
@@ -56,7 +69,6 @@ class KangarooDataset(Dataset):
     
         return boxes, width, height
 
-
     def load_mask(self, img_id):
 
         info = self.image_info[img_id]
@@ -79,10 +91,10 @@ class KangarooDataset(Dataset):
 
     # load an image reference
     def image_reference(self, img_id):
-    	info = self.image_info[img_id]
-    	return info['path']
+        info = self.image_info[img_id]
+        return info['path']
 
-dataset_dir = '/home/david/Projects/strath/kangaroo'
+dataset_dir = os.getcwd() + '/kangaroo'
 
 # training set
 
@@ -90,12 +102,107 @@ train_set = KangarooDataset()
 train_set.load_dataset(dataset_dir)
 train_set.prepare()
 
-image_id = 1
-image = train_set.load_image(image_id)
-mask, class_ids = train_set.load_mask(image_id)
-bbox = extract_bboxes(mask)
+# testing set
 
-display_instances(image, bbox, mask, class_ids, train_set.class_names)
+test_set = KangarooDataset()
+test_set.load_dataset(dataset_dir, is_train=False)
+test_set.prepare()
+
+image_id = 21
+# image = train_set.load_image(image_id)
+# mask, class_ids = train_set.load_mask(image_id)
+# bbox = extract_bboxes(mask)
+# display_instances(image, bbox, mask, class_ids, train_set.class_names)
+
+class KangarooConfig(Config):
+    NAME = 'kangaroo_config'
+    # State number of classes inc. background
+    NUM_CLASSES = 1 + 1
+    LEARNING_RATE = 0.01
+    STEPS_PER_EPOCH = 131
+
+# prepare config
+
+config = KangarooConfig()
+config.display()
+#define the model
+model = MaskRCNN(mode='training', model_dir='./', config=config)
+
+# load weights (mscoco)
+# model.load_weights('mask_rcnn_coco.h5',
+#                     by_name=True,
+#                     exclude=["mrcnn_class_logits",
+#                             "mrcnn_bbox_fc",
+#                             "mrcnn_bbox",
+#                             "mrcnn_mask"])
+
+# model.train(train_set, test_set, learning_rate=config.LEARNING_RATE, epochs=2, layers='heads')
+
+class PredictionConfig(Config):
+    NAME = 'kangaroo_config'
+    # State number of classes inc. background
+    NUM_CLASSES = 1 + 1
+    # simplify GPU config
+    GPU_COUNT = 1
+    IMAGES_PER_GPU = 1
+
+if Server:
+    weights = '/home/ubuntu/kangaroo_config20191114T1607/mask_rcnn_kangaroo_config_0002.h5'
+else:
+    weights = '/home/david/Projects/strath/kangaroo/models/kangaroo_config20191114T1607/mask_rcnn_kangaroo_config_0002.h5'
+
+tst_weights = '/home/david/Projects/strath/data/kangaroo_config20191114T1607/mask_rcnn_kangaroo_config_0002.h5'
+# create config
+cfg = PredictionConfig()
+
+# define the model
+model = MaskRCNN(mode='inference', model_dir='./', config=cfg)
+
+model.load_weights(weights, by_name=True)
+
+def evaluate_model(dataset, model, cfg):
+    APs = list()
+    for image_id in dataset.image_ids:
+        # load image, bounding boxes and masks for the image id
+        image, image_meta, gt_class_id, gt_bbox, gt_mask = load_image_gt(dataset, cfg, image_id, use_mini_mask=False)
+        # convert pixel values (e.g. center)
+        scaled_image = mold_image(image, cfg)
+        # convert image into one sample
+        sample = np.expand_dims(scaled_image, 0)
+        # make prediction
+        yhat = model.detect(sample, verbose=1)
+        # extract results for first sample
+        r = yhat[0]
+        # calculate statistics, including AP
+        AP, _, _, _ = compute_ap(gt_bbox, gt_class_id, gt_mask, r["rois"], r["class_ids"], r["scores"], r['masks'])
+        # store
+        APs.append(AP)
+
+    # calculate the mean AP across all images
+    mAP = np.mean(APs)
+
+    print('Mean Average Precision: {}'.format(mAP))
+    return mAP
+
+print('predicting on train set...')
+# # evaluate model on training dataset
+train_mAP = evaluate_model(train_set, model, cfg)
+print("Train mAP: %.3f" % train_mAP)
+
+test_mAP = evaluate_model(test_set, model, cfg)
+print("Train mAP: %.3f" % test_mAP)
 
 
+# image, image_meta, gt_class_id, gt_bbox, gt_mask = load_image_gt(train_set, cfg, 10, use_mini_mask=False)
+# # convert pixel values (e.g. center)
+# scaled_image = mold_image(image, cfg)
+# # convert image into one sample
+# sample = np.expand_dims(scaled_image, 0)
+# # make prediction
+# yhat = model.detect(sample, verbose=0)
+# # extract results for first sample
+# r = yhat[0]
+# # calculate statistics, including AP
+# AP, _, _, _ = compute_ap(gt_bbox, gt_class_id, gt_mask, r["rois"], r["class_ids"], r["scores"], r['masks'])
 
+# plt.imshow(image)
