@@ -3,6 +3,7 @@ import xml.etree.ElementTree as ET
 
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.patches import Rectangle
 
 from mrcnn.config import Config
 from mrcnn.visualize import display_instances
@@ -17,7 +18,10 @@ import warnings
 warnings.filterwarnings("ignore")
 
 Server = True
-# Server = False
+Server = False
+
+Train = True
+Train = False
 
 class KangarooDataset(Dataset):
 
@@ -129,14 +133,16 @@ config.display()
 model = MaskRCNN(mode='training', model_dir='./', config=config)
 
 # load weights (mscoco)
-# model.load_weights('mask_rcnn_coco.h5',
-#                     by_name=True,
-#                     exclude=["mrcnn_class_logits",
-#                             "mrcnn_bbox_fc",
-#                             "mrcnn_bbox",
-#                             "mrcnn_mask"])
+if Train:
 
-# model.train(train_set, test_set, learning_rate=config.LEARNING_RATE, epochs=2, layers='heads')
+    model.load_weights('mask_rcnn_coco.h5',
+                        by_name=True,
+                        exclude=["mrcnn_class_logits",
+                                "mrcnn_bbox_fc",
+                                "mrcnn_bbox",
+                                "mrcnn_mask"])
+    
+    model.train(train_set, test_set, learning_rate=config.LEARNING_RATE, epochs=7, layers='heads')
 
 class PredictionConfig(Config):
     NAME = 'kangaroo_config'
@@ -147,6 +153,7 @@ class PredictionConfig(Config):
     IMAGES_PER_GPU = 1
 
 if Server:
+
     weights = '/home/ubuntu/kangaroo_config20191114T1607/mask_rcnn_kangaroo_config_0002.h5'
 else:
     weights = '/home/david/Projects/strath/kangaroo/models/kangaroo_config20191114T1607/mask_rcnn_kangaroo_config_0002.h5'
@@ -155,54 +162,76 @@ tst_weights = '/home/david/Projects/strath/data/kangaroo_config20191114T1607/mas
 # create config
 cfg = PredictionConfig()
 
-# define the model
-model = MaskRCNN(mode='inference', model_dir='./', config=cfg)
+if not Train:
 
-model.load_weights(weights, by_name=True)
+    model = MaskRCNN(mode='inference', model_dir='./', config=cfg)
+    
+    model.load_weights(weights, by_name=True)
 
-def evaluate_model(dataset, model, cfg):
-    APs = list()
-    for image_id in dataset.image_ids:
-        # load image, bounding boxes and masks for the image id
-        image, image_meta, gt_class_id, gt_bbox, gt_mask = load_image_gt(dataset, cfg, image_id, use_mini_mask=False)
-        # convert pixel values (e.g. center)
-        scaled_image = mold_image(image, cfg)
-        # convert image into one sample
-        sample = np.expand_dims(scaled_image, 0)
-        # make prediction
-        yhat = model.detect(sample, verbose=1)
-        # extract results for first sample
-        r = yhat[0]
-        # calculate statistics, including AP
-        AP, _, _, _ = compute_ap(gt_bbox, gt_class_id, gt_mask, r["rois"], r["class_ids"], r["scores"], r['masks'])
-        # store
-        APs.append(AP)
+    def evaluate_model(dataset, model, cfg):
+        APs = list()
+        for image_id in dataset.image_ids:
+            # load image, bounding boxes and masks for the image id
+            image, image_meta, gt_class_id, gt_bbox, gt_mask = load_image_gt(dataset, cfg, image_id, use_mini_mask=False)
+            # convert pixel values (e.g. center)
+            scaled_image = mold_image(image, cfg)
+            # convert image into one sample
+            sample = np.expand_dims(scaled_image, 0)
+            # make prediction
+            yhat = model.detect(sample, verbose=1)
+            # extract results for first sample
+            r = yhat[0]
+            # calculate statistics, including AP
+            AP, _, _, _ = compute_ap(gt_bbox, gt_class_id, gt_mask, r["rois"], r["class_ids"], r["scores"], r['masks'])
+            # store
+            APs.append(AP)
+    
+        # calculate the mean AP across all images
+        mAP = np.mean(APs)
+    
+        print('Mean Average Precision: {}'.format(mAP))
+        return mAP
 
-    # calculate the mean AP across all images
-    mAP = np.mean(APs)
+    print('predicting on train set...')
+    # # # evaluate model on training dataset
+    # train_mAP = evaluate_model(train_set, model, cfg)
+    # print("Train mAP: %.3f" % train_mAP)
+    
+    # test_mAP = evaluate_model(test_set, model, cfg)
+    # print("Train mAP: %.3f" % test_mAP)
 
-    print('Mean Average Precision: {}'.format(mAP))
-    return mAP
+n_image = 2
 
-print('predicting on train set...')
-# # evaluate model on training dataset
-train_mAP = evaluate_model(train_set, model, cfg)
-print("Train mAP: %.3f" % train_mAP)
+for i in range(n_image):
+    image = test_set.load_image(i)
+    mask, _ = test_set.load_mask(i)
+    scaled_image = mold_image(image, cfg)
+    # convert image into one sample
+    sample = np.expand_dims(scaled_image, 0)
+    # make prediction
+    print('detecting...')
+    yhat = model.detect(sample, verbose=0)
+    # stage subplot
+    plt.subplot(n_image, 2, i*2+1)
+    plt.axis('off')
+    plt.imshow(image)
+    plt.title('Actual')
+    # plot masks
+    for j in range(mask.shape[2]):
+        plt.imshow(mask[:,:,j], cmap='Blues', alpha=0.3)
 
-test_mAP = evaluate_model(test_set, model, cfg)
-print("Train mAP: %.3f" % test_mAP)
+    plt.subplot(n_image, 2, i*2+2)
+    plt.axis('off')
+    plt.imshow(image)
+    plt.title('Predicted')
+    ax = plt.gca()
+    # plot predicted masks
+    yhat = yhat[0]
+    for box in yhat['rois']:
+        # get coordinates
+        y1, x1, y2, x2 = box
+        width, height = x2 - x1, y2 - y1
+        rect = Rectangle((x1, y1), width, height, fill=False, color='red')
+        ax.add_patch(rect)
 
-
-# image, image_meta, gt_class_id, gt_bbox, gt_mask = load_image_gt(train_set, cfg, 10, use_mini_mask=False)
-# # convert pixel values (e.g. center)
-# scaled_image = mold_image(image, cfg)
-# # convert image into one sample
-# sample = np.expand_dims(scaled_image, 0)
-# # make prediction
-# yhat = model.detect(sample, verbose=0)
-# # extract results for first sample
-# r = yhat[0]
-# # calculate statistics, including AP
-# AP, _, _, _ = compute_ap(gt_bbox, gt_class_id, gt_mask, r["rois"], r["class_ids"], r["scores"], r['masks'])
-
-# plt.imshow(image)
+plt.show()
