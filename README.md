@@ -1,6 +1,6 @@
 # Kangaroo Detection
 
-This is a work-in-progress object detection project for detection of kangaroos. The dataset is made up of 183 images containing kangaroos 
+This is a work-in-progress object detection project for detection of kangaroos. The dataset is made up of 183 kangaroo images 
 with bounding box annotations, and can be found [here](https://github.com/experiencor/kangaroo). 
 
 This project uses the Mask R-CNN detection and segmentation model. As the dataset does not provide image masks, we will only be using the
