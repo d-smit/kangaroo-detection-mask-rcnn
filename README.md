@@ -14,7 +14,6 @@ The Mask R-CNN library is needed to use this project.
 git clone https://github.com/matterport/Mask_RCNN.git
 cd Mask_RCNN
 python setup.py install
-pip show mask-rcnn
 ```
 
 ## Training 
@@ -28,5 +27,4 @@ training time of 8 minutes per epoch.
 
 ## Initial Results
 
-The model is currently reaching a Mean Average Precision (mAP) of 0.73. For object detection, where the aim is to perfectly align predicted
-bounding boxes with the annotated bounding box, a mean average precision above 0.50 is considered a positive detection. 
+For object detection, a commonly used metric is the Mean Average Precision (mAP). A bounding box prediction perfectly aligned over the annotated box gives an mAP of 1.0. An mAP above 0.50 is considered a positive detection. The model is currently reaching a mAP of 0.73.
