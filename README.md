@@ -27,4 +27,8 @@ training time of 8 minutes per epoch.
 
 ## Initial Results
 
-For object detection, a commonly used metric is the Mean Average Precision (mAP). A bounding box prediction perfectly aligned over the annotated box gives an mAP of 1.0. An mAP above 0.50 is considered a positive detection. The model is currently reaching a mAP of 0.73.
+For object detection, a commonly used metric is the Mean Average Precision (mAP). A bounding box prediction perfectly aligned over the annotated box gives an mAP of 1.0. An mAP above 0.50 is considered a positive detection. The model is currently reaching an mAP of 0.73 over the training set. 
+
+![](/current_predictions.png)
+
+We can see detections made for two images from the test set above. Whilst detecting the location of each kangaroo well, the model makes multiple detections over each target. Further training is required. 
