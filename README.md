@@ -27,7 +27,7 @@ training time of 8 minutes per epoch.
 
 ## Initial Results
 
-For object detection, a commonly used metric is the Mean Average Precision (mAP). A bounding box prediction perfectly aligned over the annotated box gives an mAP of 1.0. An mAP above 0.50 is considered a positive detection. The model is currently reaching an mAP of 0.73 over the training set. 
+For object detection, a commonly used metric is the Intersection over Union (IoU). A bounding box prediction perfectly aligned over the annotated box gives an IoU of 1.0. An IoU above 0.50 is considered a positive detection. Therefore precision refers to the percentage of correctly predicted bounding boxes (IoU > 0.50) out of all predictions made. The model is currently reaching a mean average precision of 0.73 over the testing set. 
 
 ![](/current_predictions.png)
 
